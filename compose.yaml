@@ -1,0 +1,54 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4173
+      NODE_ENV: production
+      AUTH_REQUIRED: "true"
+      ENABLE_REGISTRATION: "false"
+      COOKIE_SECURE: "true"
+      ACCOUNT_DB_PATH: /app/data/youshu.sqlite
+      AI_CONFIG_PATH: /app/data/ai-config.json
+      BROWSER_EXECUTABLE: /usr/bin/chromium
+    volumes:
+      - ./data:/app/data
+    expose:
+      - "4173"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/api/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop:
+      - ALL
+    pids_limit: 256
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,21 @@
+{
+  "name": "youshu-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "有术 · 独立创作工作室",
+  "scripts": {
+    "start": "node scripts/supervise.cjs",
+    "check": "node --check server.cjs && node --check article-library.cjs && node --check account-store.cjs && node --check payment-settings.cjs && node --check ai-gateway.cjs && node --check article-url.cjs && node --check article-cleaner.cjs && node --check generic-article.cjs && node --check link-extractor.cjs && node --check writing-tools.cjs && node --check writing-voice.cjs && node --check wechat-login.cjs && node --check wechat-pay.cjs && node --check qr-code.cjs && node --check public/writing-tools.js && node --check public/app.js && node --check public/chat-workspace.js && node --check public/admin.js && node --check public/account.js && node --check scripts/backup.cjs && node --check scripts/supervise.cjs && node --check public/studio-request.js",
+    "test": "node --test tests/*.test.cjs",
+    "start:direct": "node server.cjs"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "jsdom": "^31.0.0",
+    "playwright-core": "^1.64.1",
+    "undici": "^8.12.4"
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "site": "https://qdaiyoushu.com/",
+  "collectedAt": "2026-10-31T03:12:08.315Z",
+  "scope": "Public HTML and referenced JavaScript/CSS only. No server-side source or private data.",
+  "files": [
+    {
+      "url": "https://qdaiyoushu.com/",
+      "file": "index.html",
+      "bytes": 2089,
+      "sha256": "765db45d52752a64041c543749380f0846f8b5f02e61acedb9abca11c4952b01"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/app.css?v=20261031-ux2",
+      "file": "app.css",
+      "bytes": 56500,
+      "sha256": "7ef10825202c933a619cb768220e2f41db80333ad5c20ad838fe41841a544893"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/history.css?v=20261031-ux2",
+      "file": "history.css",
+      "bytes": 13789,
+      "sha256": "fbd28f336e6074c21afdf96188221b7eb6e340427b3d8580205dbf701c0fef82"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/result.css?v=20261031-ux3",
+      "file": "result.css",
+      "bytes": 19286,
+      "sha256": "65c302334aee129ad4ba040f9d160f90d7c778f8178dffb50f3182d0f2bc4693"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/model-picker.css?v=20261030-model-icons",
+      "file": "model-picker.css",
+      "bytes": 9239,
+      "sha256": "695a8e12413491bd790bc8d20086b48807cba68d1d634813111500f78ba7f8ba"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/write.css?v=20261030-reference-link",
+      "file": "write.css",
+      "bytes": 20865,
+      "sha256": "b3104077f93a480715069cc7d2c3cd32f60471baa0efce6e3d301ce2bac0a8e2"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/chat.css?v=20261030-perf3",
+      "file": "chat.css",
+      "bytes": 62325,
+      "sha256": "2dedb30431bc80ed49abfdd4cfad05f1df2bb06e358c149f4d40545ff1d5fce9"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/library.css?v=20261001-origin-title",
+      "file": "library.css",
+      "bytes": 12365,
+      "sha256": "58136947eda40c5a4947f86ce09aa34b1fdb23a7675101f3eab56e5245eb94a8"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/tool.css?v=20261016-deai-chars",
+      "file": "tool.css",
+      "bytes": 7880,
+      "sha256": "c0f8fcc990dc0f2230ae87022c134a4f9b7a6dcb449054498aa0e1f54707b7e4"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/css/membership.css?v=20261030-perf3",
+      "file": "membership.css",
+      "bytes": 10486,
+      "sha256": "790eab4915946bc6fa4d2c50286eadac653512891459eff034f09f4aa52eee99"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/core.js?v=20261031-fx2",
+      "file": "core.js",
+      "bytes": 53476,
+      "sha256": "bc1bc274fdcc9304f619500741c3a08ded5692a4357a4c7c692d52be7463689c"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/mp-bundle.js?v=20261031-acct1",
+      "file": "mp-bundle.js",
+      "bytes": 178202,
+      "sha256": "19be9f4288c9dd700d8f7df9f7b92ac90b74ddb50c1ebed530164a9d07e4af69"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/legal.js?v=20261001-lib2",
+      "file": "legal.js",
+      "bytes": 10822,
+      "sha256": "33bffbeb5086c8329e207052c39f7fe9e2b00afae09971c163b1d5497c3ec653"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/home.js?v=20261019-home-copy1",
+      "file": "home.js",
+      "bytes": 5481,
+      "sha256": "651e7407d4f97489d471d02e9974b1c5f8b4c3f2167f3d0ba3afef7551f8b9a0"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/login.js?v=20261001-root-url",
+      "file": "login.js",
+      "bytes": 5178,
+      "sha256": "868cc72504645e1a627589097cd9b97146d35e4f89f1bebd6f8f1bb2e0e4f144"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/mine.js?v=20261030-perf1",
+      "file": "mine.js",
+      "bytes": 34876,
+      "sha256": "662bbe8f8f3bf303df177e4497913df53115a95d9f4d72cba6b65f145fc4ae78"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/history.js?v=20261031-fx2",
+      "file": "history.js",
+      "bytes": 28454,
+      "sha256": "b80646c02fdcbcdb98dac6cfb79c5c05e01748800370f8b21e9ea377f18dbd6e"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/result.js?v=20261031-ux3",
+      "file": "result.js",
+      "bytes": 87790,
+      "sha256": "bdeb9a90eddd47d18b383464d4dce190a0aac616361926a3a10086deb944bbc2"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/model-picker.js?v=20261030-model-icons",
+      "file": "model-picker.js",
+      "bytes": 10380,
+      "sha256": "74fde610b1ec1e5d01813bb6c06a4183c71c3e9b349aa0e8bea9cae27f8c954f"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/write.js?v=20261031-fx2",
+      "file": "write.js",
+      "bytes": 73452,
+      "sha256": "8b98325dbdebf39e6f7e8cde6f72ba807ec2caf084873d77b1213ebec8e50487"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/chat.js?v=20261031-fx1",
+      "file": "chat.js",
+      "bytes": 106325,
+      "sha256": "7d874420f3521ce279205588da1cb2a290a1ba245120e00af57e08bf32a8f4eb"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/library.js?v=20261030-perf1",
+      "file": "library.js",
+      "bytes": 22303,
+      "sha256": "adf20da598e3c2dfe718d1c01c71edf6b790d301b24b4339952badd934eb1af0"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/tool.js?v=20261030-perf4",
+      "file": "tool.js",
+      "bytes": 24899,
+      "sha256": "cdbc447aa285bd07e839b17687900732323bcdce1d2c302cbe2e0ea20eca5360"
+    },
+    {
+      "url": "https://qdaiyoushu.com/h5/js/membership.js?v=20261016-pack-price1",
+      "file": "membership.js",
+      "bytes": 21508,
+      "sha256": "6bb17bdd2204ec2678ed02322b962922484e8544a3011c2dc86e088be6b92019"
+    }
+  ]
+}

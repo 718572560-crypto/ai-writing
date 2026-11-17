@@ -1,0 +1,8 @@
+'use strict';
+const form=document.querySelector('#login'),message=document.querySelector('#message'),wechat=document.querySelector('#wechat-login'),wechatHelp=document.querySelector('#wechat-help');
+const query=new URLSearchParams(location.search);
+if(query.get('wechat')==='failed')message.textContent='微信授权未完成，请重新扫码或使用账号密码登录。';
+if(query.get('wechat')==='expired')message.textContent='微信授权已过期，请重新扫码。';
+fetch('/api/status').then(r=>{if(!r.ok)throw new Error('无法连接本地服务。');return r.json();}).then(data=>{if(!wechat)return;if(data.wechatLoginEnabled){wechat.disabled=false;wechat.textContent='微信扫码授权登录';wechatHelp.textContent='微信网站授权已配置。登录后可在工作室设置中绑定当前微信账号。';}else{wechat.disabled=true;wechat.textContent='微信登录尚未配置';wechatHelp.textContent='缺少：'+(data.wechatLoginConfigurationMissing||'微信开放平台网站应用凭证和正式 HTTPS 域名')+'。请先完成微信开放平台网站应用认证，再把凭证配置到服务器。';}}).catch(()=>{if(wechat)wechat.textContent='微信登录状态不可用';if(wechatHelp)wechatHelp.textContent='请确认网站服务运行后刷新页面。';});
+wechat?.addEventListener('click',()=>{if(!wechat.disabled)location.href='/api/auth/wechat/start';});
+form.addEventListener('submit',async event=>{event.preventDefault();const button=form.querySelector('button');button.disabled=true;message.textContent='正在登录…';try{const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:form.elements.email.value,password:form.elements.password.value})});const data=await response.json();if(!response.ok)throw new Error(data.error||'登录失败。');location.replace('/#write');}catch(error){message.textContent=error.message||'登录失败，请重试。';}finally{button.disabled=false;}});

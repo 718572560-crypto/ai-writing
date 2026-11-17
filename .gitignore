@@ -1,0 +1,16 @@
+.env*
+!.env.example
+!.env.production.example
+node_modules/
+*.log
+ai-config.json
+ai-config.json.tmp
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.pem
+*.key
+/release-source-*/
+/youshu-studio-source-*.zip
+/.membership-ui-preview.png

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f6f2">
+  <title>管理后台 · 有术 Studio</title><link rel="stylesheet" href="./styles.css">
+  <style>
+    body{min-height:100vh;background:#f3f5f1;color:#26352e}.admin{max-width:1180px;margin:auto;padding:28px 22px}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #d7dfd6;padding-bottom:18px}.head h1{font-size:23px;margin:0}.head a{color:#24584c}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:22px 0}.metric{border-bottom:1px solid #d7dfd6;padding:4px 0 14px}.metric span{display:block;font-size:13px;color:#68766e}.metric strong{font-size:26px}.row{display:flex;gap:10px;align-items:center;margin:18px 0}.row input,.row select{font:inherit;padding:9px 11px;border:1px solid #cbd5cc;border-radius:4px;min-width:150px}.button{font:inherit;padding:9px 13px;border:1px solid #bdcabe;border-radius:4px;background:#fff;color:#29483d;cursor:pointer}.button.primary{background:#24584c;color:white;border-color:#24584c}.table-wrap{overflow:auto;background:white;border:1px solid #dce3d9;border-radius:6px}table{width:100%;border-collapse:collapse;min-width:740px}th,td{text-align:left;padding:12px;border-bottom:1px solid #edf0eb;font-size:13px}th{color:#65716b;font-weight:600}.plan-form{flex-wrap:wrap}.plan-form input{min-width:130px}.plan-form .field{display:grid;gap:5px;color:#68766e;font-size:12px}.plan-form .field input,.plan-form .field select{min-width:125px}.error{color:#9d4437;min-height:24px}.audit{margin-top:30px}.audit li{padding:7px 0;border-bottom:1px solid #e3e8e1;font-size:13px}.login{max-width:380px;margin:12vh auto;background:#fff;padding:26px;border:1px solid #dce3d9;border-radius:6px}.login label{display:grid;gap:7px;margin:14px 0}.login input{padding:10px;border:1px solid #cbd5cc;border-radius:4px}.login button{padding:10px 14px}.muted{color:#68766e;font-size:13px;line-height:1.7}@media(max-width:700px){.metrics{grid-template-columns:repeat(2,1fr)}.head{align-items:flex-start;gap:12px}.plan-form .field{width:calc(50% - 8px)}}
+  </style>
+  <link rel="stylesheet" href="./polish.css">
+</head>
+<body class="admin-page">
+  <main class="admin">
+    <header class="head"><h1>有术 Studio · 管理后台</h1><a href="/#write">返回工作室</a></header>
+    <section id="login-view" class="login" hidden><h2>管理员登录</h2><form id="admin-login"><label>账号 / 邮箱<input name="email" type="text" required autocomplete="username"></label><label>密码<input name="password" type="password" required autocomplete="current-password"></label><button class="button primary">登录</button></form></section>
+    <section id="dashboard" hidden>
+      <div class="metrics"><div class="metric"><span>注册用户</span><strong id="users-total">0</strong></div><div class="metric"><span>有效会员</span><strong id="members-total">0</strong></div><div class="metric"><span>近 24 小时调用</span><strong id="calls-total">0</strong></div><div class="metric"><span>待处理订单</span><strong id="orders-total">0</strong></div></div>
+      <p id="commerce" class="muted"></p><p id="error" class="error" role="status"></p>
+      <section class="audit"><h2>微信授权登录</h2><p class="muted">使用微信开放平台「网站应用」扫码授权。登录 AppID 与微信支付 AppID 分开配置；首次授权可自动创建普通用户。正式接入须在开放平台配置授权回调域。</p>
+        <form id="wechat-login-form" class="row plan-form" autocomplete="off">
+          <label class="field">网站应用 AppID<input name="wechatLoginAppId" maxlength="128" required></label>
+          <label class="field">网站应用 AppSecret<input name="wechatLoginAppSecret" type="password" maxlength="512" autocomplete="new-password" placeholder="首次填写，后续留空保留"></label>
+          <label class="field">正式网站 HTTPS 域名<input name="publicBaseUrl" type="url" placeholder="https://example.com" maxlength="500" required></label>
+          <label class="field"><span><input name="wechatAllowRegistration" type="checkbox" checked style="min-width:auto"> 允许首次微信授权自动注册</span></label>
+          <button class="button primary">保存微信登录配置</button>
+        </form><p id="wechat-login-result" class="muted" role="status"></p><p id="wechat-callback" class="muted"></p>
+      </section>
+      <section class="audit"><h2>收款账户</h2><p class="muted">内置微信支付 Native 扫码收款。保存后检查本地密钥格式和必填项；微信商户权限、域名和真实收款仍需上线联调。密钥加密保存且不回显，留空保留原值。平台证书和平台公钥二选一，填写新的会替换旧的验证方式。</p>
+        <form id="payment-account-form" class="row plan-form">
+          <input name="accountName" placeholder="账户名称，如：主收款账户" maxlength="80" required>
+          <input name="appId" placeholder="微信支付 AppID" maxlength="128" required>
+          <input name="mchid" placeholder="微信支付商户号" maxlength="64" required>
+          <input name="merchantSerial" placeholder="商户证书序列号" maxlength="128" required>
+          <input name="platformSerial" placeholder="平台证书序列号" maxlength="128" required>
+          <input name="publicBaseUrl" placeholder="正式 HTTPS 地址，如 https://example.com" maxlength="500" required>
+          <input name="notifyUrl" placeholder="通知地址（可留空使用默认路径）" maxlength="500">
+          <label class="field">商户私钥 Base64<textarea name="merchantPrivateKeyBase64" rows="2" placeholder="首次配置必填；后续留空表示保留原值"></textarea></label>
+          <label class="field">平台证书 Base64<textarea name="platformCertificateBase64" rows="2" placeholder="平台证书或平台公钥二选一"></textarea></label>
+          <label class="field">平台公钥 Base64<textarea name="platformPublicKeyBase64" rows="2" placeholder="平台证书或平台公钥二选一"></textarea></label>
+          <input name="apiV3Key" type="password" autocomplete="new-password" placeholder="APIv3 密钥（32 字节）" maxlength="64">
+          <button class="button primary">保存收款账户</button>
+        </form><p id="payment-account-result" class="muted" role="status"></p>
+      </section>
+      <section class="audit">
+        <h2>会员与次数套餐</h2><p class="muted">管理员可随时调整在售商品的金额、会员天数和调用次数。会员期限设为 0 表示永久；次数包的期限固定为 0。已创建订单保留原金额与权益快照。</p>
+        <form id="plan-form" class="row plan-form">
+          <input name="id" aria-label="套餐标识" placeholder="套餐标识，如 monthly" pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,39}" maxlength="40" required>
+          <input name="name" aria-label="套餐名称" placeholder="套餐名称" maxlength="80" required>
+          <label class="field">商品类型<select name="kind"><option value="membership">会员套餐</option><option value="credits">次数包</option></select></label>
+          <label class="field" id="plan-days-wrap">会员天数<input name="days" type="number" min="0" max="3650" value="30" required></label>
+          <label class="field">包含次数<input name="credits" type="number" min="1" max="100000" value="300" required></label>
+          <label class="field">售价（人民币元）<input name="price" inputmode="decimal" placeholder="如 29.90" pattern="[0-9]{1,7}(\.[0-9]{1,2})?" required></label>
+          <label class="field">展示顺序<input name="sortOrder" type="number" min="0" max="100000" value="0" required></label>
+          <label class="field"><span><input name="featured" type="checkbox" style="min-width:auto"> 推荐标记</span></label>
+          <button class="button primary">保存商品</button><button class="button" type="reset">清空</button>
+        </form>
+        <div class="table-wrap"><table><thead><tr><th>商品标识</th><th>名称 / 类型</th><th>权益</th><th>售价</th><th>展示</th><th>状态</th><th>操作</th></tr></thead><tbody id="plans"></tbody></table></div>
+      </section>
+      <section class="audit"><h2>发行兑换码</h2><p class="muted">兑换码可兑换会员期限及次数，或单独增加次数包。只显示末四位记录，不会保存明文兑换码，请在生成时自行保管并发送给用户。</p><form id="redeem-code-form" class="row plan-form"><input name="code" placeholder="自定义兑换码（6–64 位字母数字）" minlength="6" maxlength="64" pattern="[A-Za-z0-9-]{6,80}" required><label class="field">类型<select name="kind"><option value="credits">次数包</option><option value="membership">会员</option></select></label><label class="field" id="redeem-days-wrap" hidden>会员天数<input name="days" type="number" min="0" max="3650" value="30"></label><label class="field">赠送次数<input name="credits" type="number" min="1" max="100000" value="100" required></label><label class="field">可兑换人数<input name="maxRedemptions" type="number" min="1" max="100000" value="1" required></label><button class="button primary">生成兑换码</button></form><p id="redeem-code-result" class="muted" role="status"></p><div class="table-wrap"><table><thead><tr><th>兑换码尾号</th><th>权益</th><th>使用数</th><th>状态</th></tr></thead><tbody id="redeem-codes"></tbody></table></div></section>
+      <form id="create-user" class="row"><input name="email" type="email" placeholder="新用户邮箱" required><input name="password" type="password" placeholder="临时密码（至少 12 位）" required minlength="12"><button class="button primary">创建账号</button></form>
+      <form id="search" class="row"><input name="q" type="search" placeholder="按邮箱搜索用户"><button class="button">搜索</button><button class="button" type="button" id="logout">退出登录</button></form>
+      <div class="table-wrap"><table><thead><tr><th>账号</th><th>状态</th><th>会员至</th><th>剩余额度</th><th>本月调用</th><th>操作</th></tr></thead><tbody id="users"></tbody></table></div>
+      <section class="audit"><h2>最近支付订单</h2><div class="table-wrap"><table><thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>金额</th><th>状态</th><th>渠道</th><th>创建时间</th></tr></thead><tbody id="orders"></tbody></table></div></section>
+      <section class="audit"><h2>管理员操作记录</h2><ul id="audit"></ul></section>
+      <p class="muted">配置通过本地检查后开放下单；真实收款须使用已开通 Native 支付权限的微信支付商户。配置文件与密钥须一并安全备份。</p>
+    </section>
+  </main>
+  <script src="./admin.js" defer></script>
+</body>
+</html>
