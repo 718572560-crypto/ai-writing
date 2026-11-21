@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {styleGuides,craftPrinciples,writingDirection}=require('../writing-voice.cjs');
+const {styleGuides,craftPrinciples,titleCraft,endingCraft,writingDirection}=require('../writing-voice.cjs');
 
 test('writing templates give distinct, operational human-tone directions without a fixed article formula',()=>{
   assert.deepEqual(Object.keys(styleGuides),['自然叙述','温暖治愈','专业理性','轻松幽默','简洁有力']);
@@ -9,6 +9,10 @@ test('writing templates give distinct, operational human-tone directions without
   assert.match(craftPrinciples,/不强行升华/);
   assert.match(craftPrinciples,/不假装亲历/);
   assert.match(craftPrinciples,/不照搬其句子/);
+  assert.match(titleCraft,/关系、顾虑、愿望/);
+  assert.match(titleCraft,/不强塞亲情故事/);
+  assert.match(endingCraft,/最多一个问题/);
+  assert.match(endingCraft,/“你怎么看”/);
   for(const style of Object.keys(styleGuides)){
     const direction=writingDirection(style,'article');
     assert.ok(direction.includes(styleGuides[style]),style);
@@ -19,4 +23,10 @@ test('writing templates give distinct, operational human-tone directions without
   assert.match(writingDirection('轻松幽默','article'),/不硬造梗/);
   assert.match(writingDirection('自然叙述','outline'),/哪里需要事实支撑/);
   assert.match(writingDirection('专业理性','polish'),/优先小幅编辑/);
+  const article=writingDirection('自然叙述','article');
+  assert.match(article,/三个有不同切口的标题/);
+  assert.match(article,/结尾的自然互动/);
+  assert.match(article,/最多一个问题/);
+  assert.match(writingDirection('自然叙述','titles'),/不靠渲染苦难/);
+  assert.doesNotMatch(writingDirection('自然叙述','outline'),/结尾的自然互动/);
 });

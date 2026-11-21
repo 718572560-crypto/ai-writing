@@ -1,0 +1,18 @@
+.workflow-toggle{display:flex;align-items:flex-start;gap:12px;padding:16px;margin-bottom:16px;border:1px solid var(--line);border-radius:8px;background:var(--light)}
+.workflow-toggle input{width:16px;height:16px;margin:4px 0 0;accent-color:var(--green);flex-shrink:0}
+.workflow-toggle span{display:grid;gap:4px;min-width:0}.workflow-toggle strong,.workflow-title{font-size:14px;line-height:20px;font-weight:600}
+.workflow-caption{font-size:12px;line-height:16px;font-weight:400;color:#657066;text-wrap:pretty}
+.writing-workflow{border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:16px;margin:0 0 24px}
+.workflow-header{display:flex;justify-content:space-between;align-items:center;gap:12px}.workflow-heading{display:grid;gap:4px}.workflow-header strong{display:block}
+.workflow-percentage{font-size:20px;line-height:28px;font-weight:600;white-space:nowrap;color:var(--green)}
+.workflow-track{height:8px;background:var(--light);border-radius:4px;overflow:hidden;margin:16px 0}
+.workflow-fill{display:block;height:100%;background:var(--green);transform-origin:left;transition:transform 500ms cubic-bezier(0.22,1,0.36,1)}
+.workflow-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;gap:12px;padding:0;margin:0 0 12px}
+.workflow-step{display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--muted)}
+.workflow-step b{display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--light);font-weight:500;flex-shrink:0}
+.workflow-step.active{color:var(--green);font-weight:600}.workflow-step.done b{background:var(--green);color:white}.workflow-step .icon{width:16px;height:16px}
+.workflow-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px}.writing-workflow .btn{font-size:12px;line-height:16px;padding:8px 12px}
+.workflow-error{font-size:14px;line-height:20px;font-weight:400;color:#9b4635;margin:12px 0 0;text-wrap:pretty}.workflow-notice{margin:8px 0 0}
+.workflow-source-button{margin:0 0 12px}.workflow-global{position:sticky;top:8px;z-index:20;box-shadow:0 4px 16px #253c3410}
+@media(max-width:600px){.workflow-steps{gap:8px}.workflow-step{align-items:flex-start;gap:4px}.workflow-step b{width:24px;height:24px}.workflow-header{align-items:flex-start}.workflow-percentage{font-size:18px;line-height:28px}.workflow-caption{overflow-wrap:anywhere}}
+@media(prefers-reduced-motion:reduce){.workflow-fill{transition:none}}

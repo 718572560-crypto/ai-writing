@@ -32,8 +32,8 @@ const iconPaths = {
 function icon(name) { return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${iconPaths[name] || iconPaths.file}</svg>`; }
 function hydrateIcons(root = document) { $$('[data-icon]', root).forEach(e => e.innerHTML = icon(e.dataset.icon)); }
 let storageKey = 'youshu-studio-v1';
-const writingLengths = [1000,2000,3000,4000];
-const freshWriter = () => ({ id:null, mode:'article', topic:'', reference:null, platform:'微信公众号', style:'自然叙述', length:'1000', content:'', title:'', origin:'本地编辑', model:'' });
+const writingLengths = [1000,2000,3000];
+const freshWriter = () => ({ id:null, mode:'article', topic:'', reference:null, platform:'微信公众号', style:'自然叙述', length:'1000', content:'', title:'', origin:'本地编辑', model:'', autoHumanize:true });
 let db = { drafts:[], favorites:[], writer:freshWriter() };
 let storageOK = true;
 try { const saved = JSON.parse(localStorage.getItem(storageKey) || 'null'); if (saved && Array.isArray(saved.drafts) && Array.isArray(saved.favorites)) db = { drafts:saved.drafts, favorites:saved.favorites, writer:{...freshWriter(), ...saved.writer} }; }
@@ -45,6 +45,7 @@ let category = '全部';
 let filter = '';
 let libraryTime = 'today', librarySort = 'hot', libraryArticles = [], libraryImports = [], libraryDomains = ['全部'], libraryUpdatedAt = '', libraryDailyUpdatedAt = '', librarySources = [], libraryStale = false, libraryLoading = false, libraryError = '', librarySearchTimer, libraryPageNumber=1, libraryHasMore=false;
 let generating = false;
+let workflowProgress=null,workflowController=null,workflowClock;
 let linkTimer;
 let linkRequestId = 0;
 let linkController;
@@ -162,7 +163,7 @@ function fmtDate(t) { return new Date(t).toLocaleDateString('zh-CN', {month:'2-d
 function updateCount() { $('#history-count').textContent = db.drafts.length; }
 function go(page) { if (location.hash === '#' + page) render(); else location.hash = page; }
 function cancelLinkRead() { clearTimeout(linkTimer); linkRequestId++; if (linkController) linkController.abort(); linkController = null; activeLinkUrl='';activeLinkPromise=null;linkState = {kind:'',message:''}; }
-function newWork(mode = 'article', topic = '') { clearTimeout(autosaveTimer); cancelLinkRead(); if (writer.content.trim() && !saveDraft(false)) return toast('当前作品保存失败，请先导出备份。'); const model=writer.model; writer = {...freshWriter(), mode, topic, model}; persist(); go('write'); return true; }
+function newWork(mode = 'article', topic = '') { clearTimeout(autosaveTimer); cancelLinkRead(); if (writer.content.trim() && !saveDraft(false)) return toast('当前作品保存失败，请先导出备份。'); const model=writer.model,autoHumanize=writer.autoHumanize!==false; writer = {...freshWriter(), mode, topic, model,autoHumanize}; if(!generating)workflowProgress=null; persist(); go('write'); return true; }
 function humanizeCurrent() {
   if (generating) return toast('请等待当前请求完成。');
   if (!writer.content.trim()) return toast('稿纸还是空白的，请先输入原文。');
@@ -210,23 +211,41 @@ function homePage() {
   <div class="workflow-line"><strong>像做手艺一样写文章</strong><span><span class="step-dot">01</span>挑选好料</span><span class="dash"></span><span><span class="step-dot">02</span>立起骨架</span><span class="dash"></span><span><span class="step-dot">03</span>细细打磨</span><span class="dash"></span><span><span class="step-dot">04</span>精心出品</span></div>`;
 }
 function topicRows() { return topics[homeCategory].map((t, i) => `<button class="topic-row" data-action="topic" data-topic="${esc(t)}"><span class="topic-number">0${i+1}</span><span class="topic-text">${esc(t)}</span><span class="topic-tag">灵感</span>${icon('arrow')}</button>`).join(''); }
+function currentWritingWorkflow(){
+  if(workflowProgress)return workflowProgress;
+  const source=db.drafts.find(d=>d.id===writer.id&&['pending','failed','cancelled'].includes(d.automation?.state));
+  if(source)return {stage:source.automation.state==='cancelled'?'cancelled':'error',percent:50,automatic:true,source,error:source.automation.error||'上次流程在原稿保存后中断，可单独继续去 AI 味。',startedAt:null};
+  return null;
+}
+function writingWorkflowPanel(){
+  const p=currentWritingWorkflow();if(!p)return '<div id="writing-workflow-slot"></div>';
+  const running=generating,step=p.stage,failed=['error','cancelled'].includes(step);
+  const labels={generating:p.snapshot?.mode==='humanize'?'正在去 AI 味':'正在生成文章','saving-source':'正在保存原稿',humanizing:'正在去 AI 味','saving-final':'正在保存改稿',complete:'流程已完成',error:'流程未完成',cancelled:'流程已停止'};
+  const steps=p.automatic?['生成文章','去 AI 味','保存改稿']:[p.snapshot?.mode==='humanize'?'去 AI 味':'生成内容','保存作品'];
+  const active=p.automatic?(p.percent>=90?2:p.percent>=50?1:0):(p.percent>=90?1:0);
+  const elapsed=p.startedAt?Math.floor(((p.finishedAt||Date.now())-p.startedAt)/1000):0;
+  const canRetry=failed&&p.automatic&&p.source&&p.source.content.length<=20000&&p.failedStage!=='saving-final';
+  return `<section id="writing-workflow-slot" class="writing-workflow ${route!=='write'?'workflow-global':''}" aria-label="自动写作流程"><div class="workflow-header"><div class="workflow-heading"><strong class="workflow-title" role="status" aria-live="polite">${labels[step]||'写作流程'}</strong><span class="workflow-caption">${p.automatic?'生成文章 → 去 AI 味 → 保存改稿':'单步创作'}${p.startedAt?` · 已用时 <span data-workflow-elapsed>${elapsed}</span> 秒`:''}</span></div><span class="workflow-percentage">${p.percent}%</span></div><div class="workflow-track" role="progressbar" aria-label="阶段完成进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.percent}" aria-valuetext="${esc(labels[step])}，阶段进度 ${p.percent}%"><i class="workflow-fill" style="transform:scaleX(${p.percent/100})"></i></div><ol class="workflow-steps" style="grid-template-columns:repeat(${steps.length},minmax(0,1fr))">${steps.map((label,i)=>`<li class="workflow-step ${step==='complete'||i<active?'done':i===active?'active':''}" ${step!=='complete'&&i===active?'aria-current="step"':''}><b>${step==='complete'||i<active?icon('check'):i+1}</b><span>${label}</span></li>`).join('')}</ol><p class="workflow-caption workflow-notice">按完成阶段显示百分比，模型运行时保持当前值，不代表剩余时间。${running?'保持页面打开，可随时停止。':''}</p>${failed?`<p class="workflow-error" role="alert">${esc(p.error)}${p.source?' 生成原稿已保留在创作记录中。':''}</p>`:''}<div class="workflow-actions">${running?'<button class="btn small" data-action="stop-workflow">停止流程</button>':''}${canRetry?'<button class="btn small primary" data-action="retry-humanize">仅重试去 AI 味</button>':''}${p.source&&p.automatic?`<button class="btn small" data-action="view-workflow-source" data-id="${esc(p.source.id)}">查看生成原稿</button>`:''}${!running?'<button class="btn small" data-action="dismiss-workflow">收起流程</button>':''}</div></section>`;
+}
+function updateWritingWorkflowPanel(){const slot=$('#writing-workflow-slot');if(slot)slot.outerHTML=writingWorkflowPanel();}
 function writerPage() {
-  const length = String(Math.min(4000,Math.max(1000,Math.round((Number(writer.length)||1000)/1000)*1000)));
+  const length = String(Math.min(3000,Math.max(1000,Math.round((Number(writer.length)||1000)/1000)*1000)));
   if (writer.length !== length) { writer.length = length; persist(); }
   if(wtView==='chat') return chatWorkspace();
   const local = !status.configured;
   const placeholders = { article:'写下你想聊的主题、目标读者和核心观点。\n\n例如：为忙碌的上班族写一篇关于「周末留白」的文章，语气温暖，给出可执行的小建议。', outline:'你想围绕什么主题搭建文章大纲？\n写下主题、读者和想解决的问题。', titles:'输入文章主题或核心观点，探索不同的标题切入角度。', polish:'粘贴需要润色的原文。\n真实 AI 服务连接后，可优化结构与表达。', humanize:'粘贴需要去除机械表达的中文原文。\n会保留事实、限定、作者态度和文章结构，只修改确实不自然的地方。' };
   return `${workspaceTabs()}${pageHead(writer.mode === 'humanize' ? 'THE EDITING DESK' : 'THE WRITING DESK', writer.mode === 'humanize' ? '让文字，回到你的声音。' : '给灵感，一张书桌。', writer.mode === 'humanize' ? '减少套话与机械表达，保留事实、原意和文体。' : '不必等到想法完美，先写下第一句话。', `<span class="badge"><i></i>${esc(status.configured ? status.model : '本地构思模式')}</span><button class="btn small" data-action="new">${icon('plus')}新建</button>`)}
   <div class="mode-switch" aria-label="创作类型">${Object.entries(modes).map(([key,name]) => `<button class="${writer.mode === key ? 'active' : ''}" data-action="writer-mode" data-mode="${key}" aria-pressed="${writer.mode === key}">${name}</button>`).join('')}</div>
-  ${writingToolbar()}<div class="writer-grid"><section class="panel"><div class="panel-head"><h2>${icon(writer.mode === 'humanize' ? 'spark' : 'pen')}${writer.mode === 'humanize' ? '去 AI 味编辑' : '创作需求'}</h2><span class="eyebrow" style="font-size:8px">${writer.mode === 'humanize' ? 'KEEP YOUR VOICE' : 'START WITH AN IDEA'}</span></div><div class="panel-body"><div class="field"><div class="field-label topic-label"><label for="topic">${writer.mode === 'polish' || writer.mode === 'humanize' ? '待编辑原文' : '主题 / 原文'}<span class="topic-input-actions"><small id="topic-count">${writer.topic.length} / 20000</small><button class="text-btn clear-topic-btn" data-action="clear-topic" title="清空主题 / 原文，保留稿纸正文">${icon('trash')}清空文本</button></span></div><textarea id="topic" class="topic-input" aria-label="主题 / 原文" maxlength="20000" placeholder="${esc(placeholders[writer.mode])}">${esc(writer.topic)}</textarea><span class="reference-help">粘贴公开文章链接后自动提取正文。<button class="btn small reference-button" data-action="read-link">${icon('file')}读取链接</button></span><span id="reference-note" class="reference-note ${esc(linkState.kind)}" role="status" aria-live="polite">${esc(linkState.message)}</span><button class="text-btn reference-preview" data-action="preview-reference" ${writer.reference || writer.topic.startsWith('参考文章：') ? '' : 'hidden'}>展开全文 ↗</button></div>
+  ${writingToolbar()}${writingWorkflowPanel()}<div class="writer-grid"><section class="panel"><div class="panel-head"><h2>${icon(writer.mode === 'humanize' ? 'spark' : 'pen')}${writer.mode === 'humanize' ? '去 AI 味编辑' : '创作需求'}</h2><span class="eyebrow" style="font-size:8px">${writer.mode === 'humanize' ? 'KEEP YOUR VOICE' : 'START WITH AN IDEA'}</span></div><div class="panel-body"><div class="field"><div class="field-label topic-label"><label for="topic">${writer.mode === 'polish' || writer.mode === 'humanize' ? '待编辑原文' : '主题 / 原文'}<span class="topic-input-actions"><small id="topic-count">${writer.topic.length} / 20000</small><button class="text-btn clear-topic-btn" data-action="clear-topic" title="清空主题 / 原文，保留稿纸正文">${icon('trash')}清空文本</button></span></div><textarea id="topic" class="topic-input" aria-label="主题 / 原文" maxlength="20000" placeholder="${esc(placeholders[writer.mode])}">${esc(writer.topic)}</textarea><span class="reference-help">粘贴公开文章链接后自动提取正文。<button class="btn small reference-button" data-action="read-link">${icon('file')}读取链接</button></span><span id="reference-note" class="reference-note ${esc(linkState.kind)}" role="status" aria-live="polite">${esc(linkState.message)}</span><button class="text-btn reference-preview" data-action="preview-reference" ${writer.reference || writer.topic.startsWith('参考文章：') ? '' : 'hidden'}>展开全文 ↗</button></div>
   ${writer.mode === 'humanize' ? '<div class="notice">去掉空泛铺垫、重复和机械句式，保留原意与文体。沿用原文结构和篇幅，只输出修改稿。<button class="text-btn" data-action="humanizer-guide">查看编辑原则 ↗</button></div>' : `<label class="field"><span class="field-label">发布平台</span><div class="chips">${['微信公众号','今日头条','小红书','通用文章'].map(p => `<button class="chip ${writer.platform === p ? 'active' : ''}" data-action="platform" data-value="${p}" aria-pressed="${writer.platform === p}">${p}</button>`).join('')}</div></label><div class="field-row"><label class="field"><span class="field-label">表达风格</span><select id="style">${['自然叙述','温暖治愈','专业理性','轻松幽默','简洁有力'].map(s => `<option ${writer.style === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label><label class="field"><span class="field-label">目标字数</span><select id="length">${writingLengths.map(n => `<option value="${n}" ${String(writer.length) === String(n) ? 'selected' : ''}>约 ${n} 字</option>`).join('')}</select></label></div>`}
   <div class="field model-field"><label for="writer-model" class="field-label">AI 模型<button class="text-btn" data-action="connection">配置服务 ↗</button></label><input id="writer-model" list="writer-models" value="${esc(writer.model || (status.configured ? status.model : status.presets?.[0]?.id || 'gpt-6.1-sol'))}" placeholder="选择或填写服务商模型 ID" ${generating ? 'disabled' : ''}><datalist id="writer-models">${modelOptions().map(id=>`<option value="${esc(id)}"></option>`).join('')}</datalist><small>可填写中转模型别名；是否可用以服务商权限为准。</small></div>
-  <button class="btn primary generate-btn" data-action="generate" ${generating ? 'disabled' : ''}>${icon(generating ? 'refresh' : 'spark')}<span>${generating ? writer.mode === 'humanize' ? '正在逐段编辑…' : '正在认真构思…' : writer.mode === 'humanize' ? local ? '配置 AI 后开始编辑' : '开始去 AI 味编辑' : local ? (writer.mode === 'titles' ? '探索标题角度' : writer.mode === 'polish' ? '整理原文与编辑清单' : '生成写作框架') : '开始生成'}</span></button><p class="mode-note">${local ? '当前使用本地规则生成框架和写作提示，不调用 AI 模型。<button data-action="connection">连接 AI 服务</button> 后可生成完整正文与润色内容。' : writer.mode === 'humanize' ? '原文会发送到所选模型。完成后请对照检查事实和限定，原稿会保留在输入框及创作记录中。' : '主题与设置将发送到你配置的 AI 服务商。生成内容请核实后使用。'}</p></div></section>
-  <section class="panel editor-panel"><div class="panel-head"><h2>${icon('file')}你的稿纸</h2><div class="editor-tools"><button class="btn small" data-action="humanize-current" ${generating ? 'disabled' : ''}>${icon('spark')}去 AI 味</button><button class="icon-btn" data-action="copy" aria-label="复制正文" title="复制正文">${icon('copy')}</button><button class="icon-btn" data-action="export-work" aria-label="导出 Markdown" title="导出 Markdown">${icon('download')}</button></div></div><div id="editor-area">${editorArea()}</div><div class="editor-footer"><span id="save-status">${writer.id ? '已保存在此浏览器' : '内容仅保存在此浏览器'}</span><div class="editor-footer-actions">${writer.mode === 'humanize' && writer.content.trim() ? '<button class="btn small" data-action="view-humanize-source">查看原稿</button>' : ''}<button class="btn small" data-action="save">${icon('check')}保存作品</button></div></div></section></div><p class="status-local">温馨提示：关闭无痕窗口或清除浏览器数据会移除本地作品，建议定期导出备份。</p>`;
+  ${writer.mode==='article'?`<label class="workflow-toggle"><input id="auto-humanize" type="checkbox" ${writer.autoHumanize!==false?'checked':''} ${generating?'disabled':''}><span><strong>生成后自动去 AI 味</strong><small class="workflow-caption">${local?'连接 AI 后执行两步流程。当前仅生成本地框架。':'先保存生成原稿，再自动精修并另存改稿。共调用模型两次，分别占用额度。'}</small></span></label>`:''}
+  <button class="btn primary generate-btn" data-action="generate" ${generating ? 'disabled' : ''}>${icon(generating ? 'refresh' : 'spark')}<span>${generating ? ({humanizing:'正在去 AI 味…','saving-source':'正在保存原稿…','saving-final':'正在保存改稿…'}[workflowProgress?.stage] || (writer.mode==='humanize'?'正在去 AI 味…':'正在生成文章…')) : writer.mode === 'humanize' ? local ? '配置 AI 后开始编辑' : '开始去 AI 味编辑' : local ? (writer.mode === 'titles' ? '探索标题角度' : writer.mode === 'polish' ? '整理原文与编辑清单' : '生成写作框架') : writer.mode==='article'&&writer.autoHumanize!==false?'生成并自动去 AI 味':'开始生成'}</span></button><p class="mode-note">${local ? '当前使用本地规则生成框架和写作提示，不调用 AI 模型。<button data-action="connection">连接 AI 服务</button> 后可生成完整正文与润色内容。' : writer.mode === 'humanize' ? '原文会发送到所选模型。完成后请对照检查事实和限定，原稿会保留在输入框及创作记录中。' : '主题与设置将发送到你配置的 AI 服务商。生成内容请核实后使用。'}</p></div></section>
+  <section class="panel editor-panel"><div class="panel-head"><h2>${icon('file')}你的稿纸</h2><div class="editor-tools"><button class="btn small" data-action="humanize-current" ${generating ? 'disabled' : ''}>${icon('spark')}去 AI 味</button><button class="icon-btn" data-action="copy" aria-label="复制正文" title="复制正文">${icon('copy')}</button><button class="icon-btn" data-action="export-work" aria-label="导出 Markdown" title="导出 Markdown">${icon('download')}</button></div></div><div id="editor-area">${editorArea()}</div><div class="editor-footer"><span id="save-status">${writer.id ? '已保存在此浏览器' : '内容仅保存在此浏览器'}</span><div class="editor-footer-actions">${writer.sourceDraftId?`<button class="btn small" data-action="view-workflow-source" data-id="${esc(writer.sourceDraftId)}">查看生成原稿</button>`:writer.mode === 'humanize' && writer.content.trim() ? '<button class="btn small" data-action="view-humanize-source">查看原稿</button>' : ''}<button class="btn small" data-action="save">${icon('check')}保存作品</button></div></div></section></div><p class="status-local">温馨提示：关闭无痕窗口或清除浏览器数据会移除本地作品，建议定期导出备份。</p>`;
 }
 function editorArea() {
   if (writer.mode === 'humanize' && !writer.content) return `<div class="editor-empty"><div class="big-spark">✧</div><h3>改写后的文字，会留在这里。</h3><p>粘贴原文或读取文章链接，再开始去 AI 味编辑。<br>完成后可对照原稿检查、修改和保存。</p></div>`;
-  return writer.content ? `<input class="input-title" id="work-title" maxlength="100" aria-label="作品标题" placeholder="为作品起个名字" value="${esc(writer.title)}"><textarea id="output" class="output-editor" aria-label="文章正文" placeholder="在这里开始写作…">${esc(writer.content)}</textarea><div class="editor-footer"><span id="output-count">${wordCount(writer.content)} 字</span><span>${esc(writer.origin)}</span></div>` : `<div class="editor-empty"><div class="big-spark">✧</div><h3>让一个好想法，从这里生长。</h3><p>在左侧写下主题，开始构思。<br>也可以直接打开一张空白稿纸。</p><button class="btn small" data-action="blank">${icon('pen')}自由书写</button></div>`;
+  return writer.content ? `<input class="input-title" id="work-title" ${generating&&workflowProgress?.automatic&&writer.automation?.state==='pending'?'readonly':''} maxlength="100" aria-label="作品标题" placeholder="为作品起个名字" value="${esc(writer.title)}"><textarea id="output" ${generating&&workflowProgress?.automatic&&writer.automation?.state==='pending'?'readonly':''} class="output-editor" aria-label="文章正文" placeholder="在这里开始写作…">${esc(writer.content)}</textarea><div class="editor-footer"><span id="output-count">${wordCount(writer.content)} 字</span><span>${esc(writer.origin)}</span></div>` : `<div class="editor-empty"><div class="big-spark">✧</div><h3>让一个好想法，从这里生长。</h3><p>在左侧写下主题，开始构思。<br>也可以直接打开一张空白稿纸。</p><button class="btn small" data-action="blank">${icon('pen')}自由书写</button></div>`;
 }
 function card(a) {
   const saved = db.favorites.includes(a.id), art=`<div class="article-cover-art">${coverArt(a.rank||0)}</div>`, cover=a.cover?`${art}<img src="${esc(a.cover)}" alt="" loading="lazy">`:art;
@@ -261,7 +280,7 @@ function render() {
   $$('[data-nav]').forEach(a => { a.classList.toggle('active', a.dataset.nav === route); if (a.dataset.nav === route) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
   $('#sidebar').classList.remove('open');
   $('[data-action="menu"]').setAttribute('aria-expanded','false');
-  $('#main').innerHTML = route === 'home' ? homePage() : route === 'write' ? writerPage() : route === 'history' ? historyPage() : route === 'membership' ? membershipPageShell() : libraryPage();
+  $('#main').innerHTML = ((route!=='write'||wtView==='chat')&&generating?writingWorkflowPanel():'') + (route === 'home' ? homePage() : route === 'write' ? writerPage() : route === 'history' ? historyPage() : route === 'membership' ? membershipPageShell() : libraryPage());
   $$('.article-cover img', $('#main')).forEach(img => img.addEventListener('error', () => img.remove(), { once:true }));
   document.body.classList.toggle('chat-workspace-open',route==='write'&&wtView==='chat');
   updateCount();
@@ -375,28 +394,56 @@ async function generate() {
   if (writer.content.trim()) { showModal('保留当前作品', '<p>继续生成会打开一张新稿纸。当前内容会先保存到创作记录，你可以随时回来编辑。</p><div class="modal-actions"><button class="btn" data-action="close-modal">继续编辑</button><button class="btn primary" data-action="generate-confirm">保存并生成</button></div>'); return; }
   await doGenerate();
 }
-async function doGenerate() {
-  const snapshot = {...writer};
-  generating = true;
-  if (route === 'write') render();
-  try {
-    let content, generatedModel;
-    if (status.configured) {
-      const response = await studioRequest('/api/generate', { method:'POST', headers:{'Content-Type':'application/json','X-Studio-Token':status.token,...(status.csrf?{'X-CSRF-Token':status.csrf}:{})}, body:JSON.stringify(snapshot), signal:AbortSignal.timeout(190000) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || '生成失败，请重试。');
-      content = data.content; generatedModel = data.model;
-      status.verified={model:data.model,at:new Date().toISOString()}; serviceState();
-    } else content = localCompose();
-    // Keep a completed request independent of any manuscript opened while it was running.
-    const generated = {...snapshot, id:uid(), content, title:content.split('\n').find(s=>s.trim())?.replace(/^#+\s*/, '').slice(0,100) || '新作品', origin:status.configured ? (snapshot.mode === 'humanize' ? '去 AI 味 · ' : 'AI · ') + (generatedModel || status.model) : '本地规则构思', createdAt:Date.now(), updatedAt:Date.now()};
-    db.drafts.unshift(generated);
-    const unchanged = writer.id === snapshot.id && writer.topic === snapshot.topic && writer.mode === snapshot.mode && writer.content === snapshot.content && writer.platform === snapshot.platform && writer.style === snapshot.style && writer.length === snapshot.length;
-    if (unchanged) writer = {...generated};
-    const saved = persist(); updateCount();
-    toast(saved ? (status.configured ? '内容已生成并保存，请核实事实后使用。' : '写作框架已保存，可以开始填入你的故事。') : '已生成，但存储失败。请立即导出作品。');
-  } catch (error) { toast(error.name === 'TimeoutError' ? '生成超时，请稍后再试。' : error.message); }
-  finally { generating = false; if (route === 'write') render(); }
+async function doGenerate(resumeSource=null) {
+  if(generating)return;
+  clearTimeout(autosaveTimer);
+  const snapshot=structuredClone(resumeSource||writer),configured=status.configured;
+  const {topic,mode,platform,style,length,model,reference}=snapshot;
+  const automatic=configured&&snapshot.mode==='article'&&snapshot.autoHumanize!==false;
+  if(resumeSource&&!configured){toast('请先连接 AI 服务，再继续去 AI 味。');return connection();}
+  let anchor=resumeSource&&writer.id!==resumeSource.id?null:writer,expected=structuredClone(writer);
+  const matches=()=>writer===anchor&&['id','topic','mode','content','title','platform','style','length','model','autoHumanize'].every(key=>writer[key]===expected[key]);
+  const startedAt=Date.now();workflowController=new AbortController();generating=true;
+  workflowProgress={stage:resumeSource?'humanizing':'generating',percent:resumeSource?50:0,automatic,source:resumeSource,snapshot,startedAt};
+  render();
+  workflowClock=setInterval(()=>{const elapsed=$('[data-workflow-elapsed]');if(elapsed)elapsed.textContent=Math.floor((Date.now()-startedAt)/1000);},1000);
+  const request=async(path,payload,signal)=>{
+    const response=await studioRequest(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.any([signal,AbortSignal.timeout(190000)])});
+    const result=await response.json();if(!response.ok)throw new Error(result.error||'当前步骤失败，请重试。');
+    if(result.model){status.verified={model:result.model,at:new Date().toISOString()};serviceState();}return result;
+  };
+  try{
+    const outcome=await runWritingWorkflow({automatic,source:resumeSource,signal:workflowController.signal,
+      generate:signal=>configured?request('/api/generate',{topic,mode,platform,style,length,model,reference},signal):Promise.resolve({content:localCompose()}),
+      humanize:async(source,signal)=>{
+        const result=await request('/api/tool',{tool:'humanize',deep:true,text:source.content,title:source.title,platform:snapshot.platform,style:snapshot.style,model:snapshot.model||source.model||status.model,options:{intensity:'均衡',reasoning:'low',articleWorkflow:true}},signal);
+        return {content:result.analysis?.rewrite,model:result.model,changes:result.analysis?.changes||[]};
+      },
+      save:async(result,kind,source)=>{
+        const row={...snapshot,id:uid(),content:result.content,title:result.content.split('\n').find(s=>s.trim())?.replace(/^#+\s*/,'').slice(0,100)||'新作品',model:result.model||snapshot.model,origin:configured?(kind==='final'?'自动去 AI 味 · ':snapshot.mode==='humanize'?'去 AI 味 · ':'AI · ')+(result.model||status.model):'本地规则构思',createdAt:Date.now(),updatedAt:Date.now()};
+        // Source and final drafts have separate IDs; a failed second request never replaces the source.
+        delete row.automation;delete row.sourceDraftId;
+        if(automatic&&kind==='source')row.automation={state:'pending'};
+        if(kind==='final'){row.sourceDraftId=source.id;row.humanizeChanges=result.changes||[];}
+        db.drafts.unshift(row);
+        if(matches()){writer={...row};anchor=writer;expected=structuredClone(writer);}
+        if(!persist())throw new Error(kind==='final'?'改稿已生成，但浏览器保存失败。请立即导出正文。':'原稿已生成，但浏览器保存失败。请立即导出正文。');
+        if(kind==='final'){
+          const original=db.drafts.find(d=>d.id===source.id);if(original)original.automation={state:'complete',finalId:row.id};
+          // Final is already durable even if updating this optional source marker fails.
+          persist();
+        }
+        updateCount();if(route==='write')render();
+        return row;
+      },
+      onState:state=>{workflowProgress={...state,startedAt,snapshot,...(['complete','error','cancelled'].includes(state.stage)?{finishedAt:Date.now()}:{})};updateWritingWorkflowPanel();const label=$('[data-action="generate"] span');if(label&&state.stage==='humanizing')label.textContent='正在去 AI 味…';}
+    });
+    if(['error','cancelled'].includes(outcome.stage)&&outcome.source){
+      const original=db.drafts.find(d=>d.id===outcome.source.id);
+      if(original){original.automation={state:outcome.stage==='cancelled'?'cancelled':'failed',error:workflowProgress.error};if(writer.id===original.id)writer.automation={...original.automation};persist();}
+    }
+    toast(outcome.stage==='complete'?(automatic?'文章生成和去 AI 味已完成，原稿与改稿均已保存。':configured?'内容已生成并保存，请核实事实后使用。':'写作框架已保存。'):workflowProgress.error);
+  }finally{clearInterval(workflowClock);workflowController=null;generating=false;render();}
 }
 function download(name, text, type = 'text/markdown;charset=utf-8') { const url = URL.createObjectURL(new Blob([text], {type})); const a = document.createElement('a'); a.href=url; a.download=name.replace(/[<>:"/\\|?*]/g,'_'); a.click(); setTimeout(() => URL.revokeObjectURL(url),1000); }
 function exportWork(d = writer) { if (!d.content.trim()) return toast('稿纸还是空白的，写一点再导出吧。'); download((d.title || '有术作品') + '.md', d.content); toast('已导出 Markdown 文件'); }
@@ -459,6 +506,10 @@ document.addEventListener('click', async e => {
   if (action === 'writer-mode') { writer.mode=el.dataset.mode; persist(); render(); return; }
   if (action === 'platform') { writer.platform=el.dataset.value; persist(); $$('.chips [data-action="platform"]').forEach(b=>{b.classList.toggle('active',b===el);b.setAttribute('aria-pressed',b===el);}); return; }
   if (action === 'generate') return generate();
+  if (action === 'stop-workflow') { workflowController?.abort();return; }
+  if (action === 'retry-humanize') { const source=currentWritingWorkflow()?.source;if(!source)return toast('原稿记录不存在，请从创作记录重新打开。');if(generating)return;return doGenerate({...source,autoHumanize:true}); }
+  if (action === 'view-workflow-source') { const source=db.drafts.find(d=>d.id===el.dataset.id);if(!source)return toast('生成原稿已被移除。');return showModal('生成原稿 · 保留版本',`<div class="article-full">${esc(source.content)}</div><div class="modal-actions"><button class="btn" data-action="export-draft" data-id="${esc(source.id)}">导出原稿</button><button class="btn" data-action="close-modal">返回</button></div>`); }
+  if (action === 'dismiss-workflow') { workflowProgress=null;const d=db.drafts.find(d=>d.id===writer.id);if(d?.automation&&d.automation.state!=='complete'){d.automation.state='dismissed';writer.automation={...d.automation};persist();}return render(); }
   if (action === 'read-link') return readReferenceLink();
   if (action === 'clear-topic') return clearTopicText();
   if (action === 'undo-clear-topic') return undoClearTopic();
@@ -498,6 +549,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('submit',async e=>{if(e.target.id!=='password-change')return;e.preventDefault();const form=e.target,message=$('#password-message'),button=form.querySelector('button');button.disabled=true;message.textContent='正在更新…';try{const response=await fetch('/api/auth/password',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':status.csrf},body:JSON.stringify({currentPassword:form.elements.currentPassword.value,newPassword:form.elements.newPassword.value})});const result=await response.json();if(!response.ok)throw new Error(result.error||'密码更新失败。');status.csrf=result.csrf;form.reset();message.textContent='密码已更新，其他登录会话已退出。';}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
 document.addEventListener('input', e => {
   const el=e.target;
+  if (el.id==='auto-humanize') { writer.autoHumanize=el.checked;persist();const label=$('[data-action="generate"] span');if(label&&!generating&&status.configured)label.textContent=el.checked?'生成并自动去 AI 味':'开始生成';return; }
   if (el.id==='library-search') { filter=el.value; libraryPageNumber=1; clearTimeout(librarySearchTimer); librarySearchTimer=setTimeout(()=>loadLibrary(),350); return; }
   if (el.id==='history-search') { filter=el.value; $('#record-list').innerHTML=historyResults(); return; }
   if (el.id==='global-search') return searchResults(el.value);

@@ -28,7 +28,8 @@ test('platform checklist varies by platform and sensitive quotations are masked'
 test('tool workflows retain distinct inputs, article plans, diagnosis dimensions and edit explanations',()=>{
  const {toolPrompt}=require('../writing-tools.cjs');
  const base={text:'社区书店原稿',title:'周末记录',platform:'微信公众号',style:'自然叙述'};
- assert.match(toolPrompt({...base,tool:'topic',options:{audience:'附近居民',goal:'周末去处'}}),/topics 必须包含 4 个方案/);
+ const topicPrompt=toolPrompt({...base,tool:'topic',options:{audience:'附近居民',goal:'周末去处'}});
+ assert.match(topicPrompt,/topics 必须包含 4 个方案/);assert.match(topicPrompt,/标题的人情味/);assert.match(topicPrompt,/不强塞亲情故事/);
  assert.match(toolPrompt({...base,tool:'quality',options:{focus:['论证']}}),/dimensions/);
  assert.match(toolPrompt({...base,tool:'followup',options:{action:'integrate',answers:[{question:'去了哪家店',answer:'街角书店'}]}}),/街角书店/);
  assert.match(toolPrompt({...base,tool:'toutiao',options:{notice:'题文不符'}}),/用户实际收到/);

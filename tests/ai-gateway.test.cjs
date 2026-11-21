@@ -25,6 +25,9 @@ test('API address normalization and credential destination isolation', async t =
 test('relay config API, discovery, Responses and Chat generation, errors and persistence', async t => {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'studio-integration-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const requests=[];
+  const sourceParagraph='冬季值班时，图书角的借阅记录依然放在前台，开放安排临时调整由工作人员手写说明。读者通常先在书架上选书，再到入口的服务台登记归还日期。';
+  const sourceText=sourceParagraph+'\n\n初次到访者常从东门进入，容易错过写着还书流程的小纸条。原来的说明贴在前台桌面内侧，只有已经走到工作人员旁边时才看得到。午间前台交班时有一段空档。';
+  const reference={title:'图书角走访',source:'街区通讯',url:'https://example.test/notes'};
   const upstream=http.createServer(async(req,res)=>{
     let text='';for await(const chunk of req) text+=chunk;
     const body=text?JSON.parse(text):null;requests.push({url:req.url,auth:req.headers.authorization,body});
@@ -36,7 +39,16 @@ test('relay config API, discovery, Responses and Chat generation, errors and per
     if(body.model==='empty')return res.end('{}');
     if(body.model==='truncated') return res.end(JSON.stringify({status:'incomplete',output:[{type:'message',content:[{type:'output_text',text:'不完整内容'}]}]}));
     if(req.url==='/v1/responses')return res.end(JSON.stringify({status:'completed',output:[{type:'reasoning',summary:[]},{type:'message',content:[{type:'output_text',text:'# 协议测试文章\n\n连接成功'}]}],usage:{input_tokens:15,output_tokens:20}}));
-    return res.end(JSON.stringify({choices:[{message:{content:[{type:'text',text:'# Chat 测试文章\n\n连接成功'}]},finish_reason:'stop'}]}));
+    const fixtures={
+      'thin-material':'【需要补充素材】\n请提供活动记录和主办方的原始公告。',
+      'copied-draft':'# 新标题\n\n'+sourceText,
+      'duplicate-draft':'# 新标题\n\n'+sourceParagraph+'\n\n**'+sourceParagraph+'**',
+      'no-reference':'# 第一次到图书角，先看哪个方向\n\n把还书提示移到读者抵达的位置。',
+      'new-draft':'# 第一次到图书角，先看哪个方向\n\n把还书提示移到读者抵达的位置。\n\n[来源：街区通讯]('+reference.url+')',
+      'altered-rewrite':JSON.stringify({summary:'改写',rewrite:'周六借出的 30 本书。',changes:[]}),
+      'faithful-rewrite':JSON.stringify({summary:'改写',rewrite:'周六借出了 30 本书（[登记表]('+reference.url+')）。',changes:[]})
+    };
+    return res.end(JSON.stringify({choices:[{message:{content:[{type:'text',text:fixtures[body.model]||'# Chat 测试文章\n\n连接成功'}]},finish_reason:'stop'}]}));
   });
   await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve));t.after(()=>upstream.close());
   const relay='http://127.0.0.1:'+upstream.address().port+'/v1';
@@ -61,6 +73,7 @@ test('relay config API, discovery, Responses and Chat generation, errors and per
   assert.equal((await(await fetch(base+'/api/status')).json()).verified.model,'gpt-6.1-sol');
   const generated=await post('/api/generate',{topic:'周末留白',model:'relay/custom',mode:'outline'});assert.equal(generated.status,200);assert.equal((await generated.json()).model,'relay/custom');
   let last=requests.at(-1);assert.equal(last.url,'/v1/responses');assert.equal(last.auth,'Bearer secret-integration');assert.equal(last.body.store,false);assert.equal(last.body.reasoning.effort,'low');assert.match(last.body.input,/周末留白/);assert.equal(last.body.max_output_tokens,16000);
+  assert.doesNotMatch(last.body.instructions,/中文原创文章编辑/);
   const bad=await post('/api/ai/test',{...same,model:'bad-key'});assert.equal(bad.status,502);const message=await bad.text();assert.match(message,/401/);assert.equal(message.includes('secret-integration'),false);
   assert.equal((await post('/api/ai/test',{...same,model:'empty'})).status,502);
   assert.equal((await post('/api/ai/test',{...same,model:'truncated'})).status,502);
@@ -69,12 +82,36 @@ test('relay config API, discovery, Responses and Chat generation, errors and per
   await post('/api/ai/config',{...same,protocol:'chat',tokenField:'max_tokens',reasoning:'auto'});
   const chat=await post('/api/generate',{topic:'真实主题',model:'relay/custom',length:5000});assert.equal(chat.status,200);assert.match((await chat.json()).content,/Chat/);
   last=requests.at(-1);assert.equal(last.url,'/v1/chat/completions');assert.equal(last.body.max_tokens,16000);assert.equal(last.body.reasoning_effort,undefined);
-  assert.match(last.body.messages[1].content,/目标长度：约 4000 字/); // Older clients cannot exceed the current four length options.
+  assert.match(last.body.messages[1].content,/目标长度：约 3000 字/); // Old clients are capped at the largest remaining option.
   assert.match(last.body.messages[1].content,/让情绪有来处/);
   assert.match(last.body.messages[1].content,/长短句和段落可有变化/);
   assert.match(last.body.messages[1].content,/不强行升华/);
   assert.match(last.body.messages[1].content,/不强制 Markdown 一级标题/);
   assert.match(last.body.messages[0].content,/不是展示结构多完美/);
+  assert.match(last.body.messages[0].content,/中文原创文章编辑/);
+  assert.match(last.body.messages[0].content,/初稿就检查模板节奏/);
+  assert.match(last.body.messages[0].content,/标题的人情味/);
+  assert.match(last.body.messages[0].content,/三个有不同切口的标题/);
+  assert.match(last.body.messages[0].content,/结尾的自然互动/);
+  assert.match(last.body.messages[0].content,/最多一个问题/);
+  for(const length of [1000,2000,3000,4000]) {
+    assert.equal((await post('/api/generate',{topic:'字数范围测试',mode:'outline',length})).status,200);
+    assert.match(requests.at(-1).body.messages[1].content,new RegExp('目标长度：约 '+Math.min(length,3000)+' 字'));
+  }
+  const draft=(model,extra={})=>post('/api/generate',{topic:sourceText,mode:'article',model,...extra});
+  const enough=await draft('new-draft',{reference});assert.equal(enough.status,200);assert.match((await enough.json()).content,/街区通讯/);
+  assert.match(requests.at(-1).body.messages[1].content,/街区通讯.*example\.test\/notes/);
+  const thin=await draft('thin-material');assert.equal(thin.status,422);assert.match((await thin.json()).error,/原始公告/);
+  const copied=await draft('copied-draft',{reference});assert.equal(copied.status,422);assert.match((await copied.json()).error,/大段沿用了参考原文/);
+  const missing=await draft('no-reference',{reference});assert.equal(missing.status,422);assert.match((await missing.json()).error,/漏掉了.*来源链接/);
+  const duplicate=await draft('duplicate-draft');assert.equal(duplicate.status,422);assert.match((await duplicate.json()).error,/大段重复/);
+ const rewrite=(model,options)=>post('/api/tool',{tool:'humanize',text:'周六记录借出 30 本书。\n\n你家附近的图书角有类似经历吗？欢迎说说。见 '+reference.url,deep:true,model,options});
+  const changed=await rewrite('altered-rewrite',{articleWorkflow:true});assert.equal(changed.status,422);assert.match((await changed.json()).error,/原稿仍在/);
+  const faithful=await rewrite('faithful-rewrite',{articleWorkflow:true});assert.equal(faithful.status,200);assert.match((await faithful.json()).analysis.rewrite,/30 本/);
+  assert.match(requests.at(-1).body.messages[0].content,/保留原稿的切入点/);
+  assert.match(requests.at(-1).body.messages[0].content,/保留标题中已有的人物处境/);
+  assert.match(requests.at(-1).body.messages[0].content,/保留问题指向/);
+  assert.equal((await rewrite('altered-rewrite',{})).status,200); // Standalone editing still uses its original contract.
   const restored=createGateway(dir).publicConfig();assert.equal(restored.protocol,'chat');assert.equal(restored.configured,true);
   assert.equal((await fetch(base+'/ai-config.json')).status,404);
 });
@@ -88,6 +125,14 @@ test('humanizer defaults to fast reasoning, uses a compact response schema, and 
  const result=await ai.runTool({tool:'humanize',text:'在日常生活中，很多人都会发现规律运动非常重要。值得一提的是，运动可以增强体质。',options:{intensity:'均衡',reasoning:'low'}});
  assert.equal(result.analysis.rewrite,output.rewrite);assert.equal(result.analysis.changes.length,1);assert.equal(seen.reasoning_effort,'low');assert.equal(seen.max_completion_tokens,8000);
  const prompt=seen.messages[1].content;assert.match(prompt,/changes 仅列最多 6 项重要/);assert.match(prompt,/完整编辑稿/);assert.doesNotMatch(prompt,/"questions"|"titles"|"topics"|"dimensions"/);
+ const system=seen.messages[0].content;assert.match(system,/中文编辑检查点/);assert.match(system,/层叠的“的”/);assert.match(system,/读者上下文/);assert.match(system,/对照示例/);assert.match(system,/同一次回答内部完成/);
+ assert.doesNotMatch(system,/allowed-tools:|AskUserQuestion/); // Upstream tool permissions stay outside runtime prompts.
+ assert.match(system,/标题中已有的生活细节/);
+ assert.match(system,/不额外添加互动/);
+ await ai.generate({mode:'humanize',topic:'原稿中的信息。'});
+ assert.match(seen.messages[0].content,/中文编辑检查点/);
+ assert.match(seen.messages[0].content,/可以原样保留/);
+ assert.equal(seen.max_completion_tokens,18000);
 });
 
 test('humanizer retries once when the model response is not valid JSON',async t=>{

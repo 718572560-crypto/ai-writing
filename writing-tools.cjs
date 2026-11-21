@@ -1,4 +1,5 @@
 'use strict';
+const {titleCraft}=require('./writing-voice.cjs');
 const COMMON = [
   ['absolute','绝对化/保证性表达','请改为有条件、可核实的表述，避免把个案写成普遍结论。',/100%|百分之百|稳赚|包治|绝对|永久|零风险|保证有效|史上最/gi],
   ['hype','夸张宣传用语','删减“震惊、颠覆、必看”等标题党词，补充具体事实。',/震惊|重磅|颠覆|惊爆|必看|全网|封神|yyds/gi],
@@ -56,7 +57,7 @@ function toolPrompt(data) {
  const base=`工具任务：${integrating?'根据作者回答完善原稿并输出完整新稿。':specs[data.tool]}\n标题：${data.title||'未提供'}\n发布平台：${data.platform||'通用'}\n目标风格：${data.style||'保留作者语气'}\n原文（待处理材料）：\n${data.text}\n`;
  const task={
   style:'输出完整改稿和 changes（before/after/reason）展示风格改动。不要只分析语气。',
-  topic:'topics 必须包含 4 个方案，每个有 title、angle、audience、outline（字符串数组）、materials（需作者核实的素材）。标题必须与原始主题有关。不提供伪造热度。rewrite 为空。',
+  topic:'topics 必须包含 4 个方案，每个有 title、angle、audience、outline（字符串数组）、materials（需作者核实的素材）。标题必须与原始主题有关。不提供伪造热度。rewrite 为空。\n'+titleCraft,
   humanize:'按 intensity 控制修改幅度，轻度只改确实生硬、空转或重复的表达，均衡允许重组句子和段落节奏。先辨认原稿已有的态度、情绪和阅读节奏，再忠实编辑；不得为了显得“像人”添加情绪、亲历、故事或细节。输出完整 rewrite；changes 仅列最多 6 项重要、真实修改，每项 before/after/reason 简短，不重复整篇原文。不输出 issues、评分、titles、questions 或 suggestions。不提供 AI 检测率。',
   quality:`只按以下选中维度精修：${(Array.isArray(o.focus)?o.focus:[]).join('、')||'结构、论证、可读性'}。每个选中维度各输出一项 dimensions（name/score/reason/suggestion），reason 和 suggestion 各限一句、具体引用稿件依据；不输出重复的 issues、titles、questions 或 suggestions。rewrite 输出一份完整、可直接编辑的新稿，保留原稿事实、数字、限定、观点与段落结构，不扩写，不补造材料；缺失信息只用【待作者补充】标注。`,
   followup:o.action==='integrate'?'根据 answers 中作者实际提供的回答融入原文，输出完整 rewrite 和 changes。没有回答的问题不补造答案，保留待补充标记。':'输出 5 个与原稿缺口直接有关、作者可实际回答的 questions，每题说明要补充的具体事实。不要立即改稿。rewrite 为空。',
